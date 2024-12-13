@@ -7,6 +7,8 @@ import sys
 import time
 import threading
 
+from jedi.debug import speed
+
 os.environ["DISPLAY"] = ":0.0"
 
 from kivy.app import App
@@ -138,13 +140,19 @@ class MainScreen(Screen):
         print("Move ramp up and down here")
 
     def auto(self):
-        print("Run through one cycle of the perpetual motion machine")
-
-    def setRampSpeed(self, speed):
-        print("Set the ramp speed and update slider text")
-
-    def setStaircaseSpeed(self, speed):
-        print("Set the staircase speed and update slider text")
+        dpiStepper.enableMotors(True)
+        dpiStepper.moveToHomeInSteps(stepper_num, 1, 8000, 45000)
+        self.setRampSpeed()
+        dpiStepper.enableMotors(False)
+        if dpiComputer.readDigitalIn(dpiComputer.IN_CONNECTOR__IN_0) == 0:
+            self.moveRamp()
+            self.turnOnStaircase()
+            sleep(8)
+            self.openGate()
+            self.turnOnStaircase()
+            sleep(1)
+            self.openGate()
+            Clock.schedule_interval(self.isBallAtBottomOfRamp,0.05)
 
     def initialize(self):
         print("Close gate, stop staircase and home ramp here")
@@ -174,48 +182,40 @@ class MainScreen(Screen):
     def turnOnStaircase(self):
         servo_num = 0
         if not self.stair:
-            dpiComputer.writeServo(servo_num, 180)
+            dpiComputer.writeServo(servo_num, int(90*(self.ids.staircaseSpeed.value/50)+90))
             self.stair = True
         else:
             dpiComputer.writeServo(servo_num, 90)
             self.stair = False
 
     def moveRamp(self):
-        # if dpiComputer.readDigitalIn(dpiComputer.IN_CONNECTOR__IN_0) == 0:
-            dpiStepper.enableMotors(True)
-            print("WORK")
-            dpiStepper.moveToHomeInSteps(stepper_num,1,1600,41000)
-            dpiStepper.moveToRelativePositionInSteps(stepper_num,-42000, True)
-            dpiStepper.moveToRelativePositionInSteps(stepper_num,42000,True)
-            print("PLEASE")
-            dpiStepper.enableMotors(False)
-
-        # print("HELLO???")
-        # dpiStepper.enableMotors(True)
-        # dpiStepper.moveToHomeInSteps(stepper_num, 1, 1600, 41000)
-        # dpiStepper.enableMotors(False)
-        # print(":/")
-
-    def setRampSpeed(self):
         dpiStepper.enableMotors(True)
-        speed_steps_per_second = 1600
+        dpiStepper.moveToRelativePositionInSteps(stepper_num,-45000, True)
+        dpiStepper.moveToRelativePositionInSteps(stepper_num,45000,True)
+        dpiStepper.moveToHomeInSteps(stepper_num, 1, 16000, 45000)
+        dpiStepper.enableMotors(False)
+
+    def setRampSpeed(self, value=0):
+        speed_steps_per_second = 1600*(8*(self.ids.rampSpeed.value/200)+2)
+        print(speed_steps_per_second)
         accel_steps_per_second_per_second = speed_steps_per_second
-        dpiStepper.setSpeedInStepsPerSecond(0, speed_steps_per_second)
-        dpiStepper.setAccelerationInStepsPerSecondPerSecond(0, accel_steps_per_second_per_second)
-        dpiStepper.moveToRelativePositionInSteps(stepper_num, 24000, True)
-        sleep(5)
+        dpiStepper.setSpeedInStepsPerSecond(stepper_num, speed_steps_per_second)
+        dpiStepper.setAccelerationInStepsPerSecondPerSecond(stepper_num, accel_steps_per_second_per_second)
+
+        # global speed_steps_per_second
+        # speed_steps_per_second = 1600 * self.ids.rampSpeed.value
+        # print(speed_steps_per_second)
 
     def setStaircaseSpeed(self):
-        servo_num = 0
-        speed = 0
-        if dpiComputer.readDigitalIn(dpiComputer.IN_CONNECTOR__IN_0) == 0:
-            dpiComputer.writeServo(servo_num, speed)
+        print("useless")
 
-    def isBallAtBottomOfRamp(self):
-        print("x")
+    def isBallAtBottomOfRamp(self, dt=0):
+        if dpiComputer.readDigitalIn(dpiComputer.IN_CONNECTOR__IN_0) == 0:
+            Clock.unschedule(self.isBallAtTopOfRamp)
+            self.auto()
 
     def isBallAtTopOfRamp(self):
-        print("x")
+        print("unnecessary")
 
 
 sm.add_widget(MainScreen(name='main'))
